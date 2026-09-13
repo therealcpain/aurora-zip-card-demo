@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aurora ZIP Card — tonight? one glance</title>
+  <meta name="description" content="Paste a US ZIP or lat,lon. Get one shareable tonight card: NOAA Kp, OVATION cell %, Open-Meteo clouds, darkness window, and look-north/south. Sources on the face. Not a fake 87% chance.">
+  <meta name="theme-color" content="#070b12">
+  <meta property="og:title" content="Aurora ZIP Card">
+  <meta property="og:description" content="ZIP → tonight? Kp · OVATION% · clouds · look direction. NOAA cited. No login.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="site">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">AZ</div>
+        <div>
+          <h1>Aurora ZIP Card</h1>
+          <p class="tagline">Paste a ZIP → one tonight card. NOAA cited. No login.</p>
+        </div>
+      </div>
+      <span class="badge">Not a chase dashboard</span>
+    </header>
+
+    <aside class="myth-banner" role="note">
+      <strong>Honesty first.</strong>
+      NOAA removed the consumer viewline in May 2026. This card does <em>not</em> invent an 87% chance.
+      OVATION is a precipitation model, not a substorm guarantee. Kp is planetary, not your backyard.
+    </aside>
+
+    <section class="panel lookup" aria-labelledby="lookup-heading">
+      <h2 id="lookup-heading">1. Paste a ZIP (or lat, lon)</h2>
+      <div class="row">
+        <div class="grow">
+          <label for="queryInput">US ZIP, or latitude, longitude</label>
+          <input id="queryInput" type="text" inputmode="decimal" placeholder="e.g. 55401 · 64.84, -147.72" autocomplete="off" />
+        </div>
+        <button type="button" class="btn btn-primary" id="lookupBtn" style="align-self:flex-end">Tonight card</button>
+      </div>
+      <p class="hint">Live NOAA SWPC JSON first (Kp + OVATION). Open-Meteo for clouds and darkness. If a fetch is blocked, seed ZIPs still render with a labeled snapshot — never a guessed %.</p>
+      <div class="seed-chips" id="seedChips" role="list" aria-label="Seed locations"></div>
+    </section>
+
+    <section class="panel card-panel" aria-labelledby="card-heading" id="cardSection" hidden>
+      <div class="card-toolbar">
+        <h2 id="card-heading">2. Tonight card</h2>
+        <div class="actions">
+          <button type="button" class="btn" id="copyCard">Copy summary</button>
+          <button type="button" class="btn" id="shareBtn">Share link</button>
+          <button type="button" class="btn" id="exportPng">Export PNG</button>
+        </div>
+      </div>
+
+      <article class="tonight-card" id="tonightCard">
+        <header class="card-head">
+          <div>
+            <p class="brand-line">Aurora ZIP Card</p>
+            <p class="meta-line" id="cardPlace">—</p>
+            <h3 id="cardHeadline">—</h3>
+          </div>
+          <div class="verdict" id="verdictBadge">
+            <span class="verdict-k" id="verdictLabel">—</span>
+            <span class="verdict-s" id="verdictSub">—</span>
+          </div>
+        </header>
+
+        <div class="stat-grid" id="statGrid" role="group" aria-label="Kp, OVATION, clouds, look direction">
+          <div class="stat" id="statKp">
+            <span class="k">Kp now</span>
+            <span class="v" id="kpValue">—</span>
+            <span class="s" id="kpScale">—</span>
+          </div>
+          <div class="stat" id="statOvation">
+            <span class="k">OVATION cell</span>
+            <span class="v" id="ovationValue">—</span>
+            <span class="s" id="ovationNote">nearest 1° cell</span>
+          </div>
+          <div class="stat" id="statCloud">
+            <span class="k">Clouds tonight</span>
+            <span class="v" id="cloudValue">—</span>
+            <span class="s" id="cloudNote">—</span>
+          </div>
+          <div class="stat look-stat" id="statLook">
+            <span class="k">Look</span>
+            <div class="look-row">
+              <span class="compass" id="compass" aria-hidden="true"></span>
+              <span class="v" id="lookValue">—</span>
+            </div>
+            <span class="s" id="lookNote">—</span>
+          </div>
+        </div>
+
+        <div class="dark-block" id="darkBlock">
+          <div class="dark-head">
+            <strong id="darkTitle">Darkness window</strong>
+            <span class="mono" id="darkRange">—</span>
+          </div>
+          <div class="dark-track" id="darkTrack" role="img" aria-label="Tonight cloud hours after sunset"></div>
+          <p class="dark-meta" id="darkMeta">—</p>
+        </div>
+
+        <div class="kp-strip" id="kpStrip" role="img" aria-label="Observed and 3-day predicted Kp">
+          <div class="dark-head">
+            <strong>Kp · observed + 3-day</strong>
+            <span class="mono" id="kpPeak">—</span>
+          </div>
+          <div class="bars" id="kpBars"></div>
+        </div>
+
+        <aside class="honest-callout" id="honestCallout" role="note">
+          OVATION ≠ substorm. A quiet cell can still pop; a high cell can still be washed out. This is not a percentage chance you will see aurora.
+        </aside>
+
+        <footer class="card-foot">
+          <div class="sources" id="sourceLine">Sources: —</div>
+          <div class="source-links" id="sourceLinks"></div>
+        </footer>
+      </article>
+
+      <div class="share-box" id="shareBox" hidden>
+        <label for="shareUrl">Share URL (hash = ZIP or lat,lon)</label>
+        <div class="row">
+          <input id="shareUrl" type="text" readonly />
+          <button type="button" class="btn" id="copyShare" style="flex:0 0 auto">Copy</button>
+        </div>
+        <p class="hint">Append UTM when you post, e.g. <code>?utm_source=reddit&amp;utm_medium=organic&amp;utm_campaign=aurora_zip_card_mvp</code></p>
+      </div>
+      <p class="status" id="status" role="status"></p>
+    </section>
+
+    <section class="panel legend" aria-labelledby="legend-heading">
+      <h2 id="legend-heading">How to read the card</h2>
+      <ul class="legend-list">
+        <li><span class="pill go">Go out</span> Darkness + a clearer window + enough activity that a look is worth it. Still not a guarantee.</li>
+        <li><span class="pill maybe">Maybe</span> Mixed signals. Fine if you’re already outside; don’t drive an hour on this card alone.</li>
+        <li><span class="pill stay">Stay in</span> Daylight, socked-in clouds, or a quiet oval. Check again if Kp jumps.</li>
+        <li><strong>Kp</strong> is a planetary 0–9 index (NOAA G-scale from Kp 5). It is not “% chance over your ZIP.”</li>
+        <li><strong>OVATION %</strong> is the nearest 1° SWPC cell — precipitation probability, not “you will see it.”</li>
+        <li><strong>Look</strong> is a horizon hint (N / S / overhead), not a camera azimuth.</li>
+      </ul>
+    </section>
+
+    <footer>
+      <strong>Aurora ZIP Card</strong> — one-glance tonight card from public NOAA SWPC + Open-Meteo.
+      <ul>
+        <li>Kp · OVATION cell % · clouds · darkness · look direction</li>
+        <li>Sources on the face · zero login · not a chase dashboard</li>
+        <li>Free utility · ad-supported path (see README)</li>
+      </ul>
+    </footer>
+    <canvas id="pngCanvas" width="720" height="1180" hidden aria-hidden="true"></canvas>
+  </div>
+</body>
+</html>
