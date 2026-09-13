@@ -284,13 +284,37 @@
   }
 
   function verdict(opts) {
-    const { kp, ovation, cloudMin, hasDark, lat } = opts;
+    const { kp, ovation, cloudMin, hasDark, lat, darkKnown, cloudsKnown } = opts;
+    // Fetch miss: never invent daylight or "socked in" from missing Open-Meteo.
+    if (!darkKnown) {
+      return {
+        key: "maybe",
+        label: "MAYBE",
+        sub: "Darkness / clouds unavailable — no invented sky. Retry when Open-Meteo answers.",
+        headline: "Sky data incomplete",
+      };
+    }
     if (!hasDark) {
       return {
         key: "stay",
         label: "STAY IN",
         sub: "No darkness window in the forecast hours we have.",
         headline: "Daylight / no dark window",
+      };
+    }
+    if (!cloudsKnown) {
+      const mid = Math.abs(lat) < 55;
+      const activity =
+        (ovation != null && ovation >= 10) ||
+        (mid && kp != null && kp >= 5) ||
+        (!mid && ((ovation != null && ovation >= 5) || (kp != null && kp >= 3)));
+      return {
+        key: "maybe",
+        label: "MAYBE",
+        sub: activity
+          ? "Activity signal is there, but cloud cover is unavailable — don’t drive on this alone."
+          : "Quiet activity and clouds unavailable. Check again if Kp jumps.",
+        headline: activity ? "Activity · clouds unknown" : "Incomplete · clouds unknown",
       };
     }
     if (cloudMin != null && cloudMin >= 80) {
@@ -544,6 +568,7 @@
     current = card;
     $("cardSection").hidden = false;
     $("cardPlace").textContent = card.label + " · " + card.lat.toFixed(2) + "°, " + card.lon.toFixed(2) + "°";
+    $("cardAsOf").textContent = card.asOfLine || "";
     $("cardHeadline").textContent = card.verdict.headline;
     const badge = $("verdictBadge");
     badge.className = "verdict " + card.verdict.key;
@@ -552,13 +577,16 @@
 
     $("kpValue").textContent = card.kpLabel;
     $("kpScale").textContent = card.kpScale;
+    $("statKp").classList.toggle("unavailable", !card.kpLive);
     $("ovationValue").textContent = card.ovation == null ? "—" : card.ovation + "%";
     $("ovationNote").textContent =
       card.ovation == null
         ? card.ovationNote
         : "cell " + card.ovationCell + " · " + card.ovationNote;
+    $("statOvation").classList.toggle("unavailable", card.ovation == null);
     $("cloudValue").textContent = card.cloud.label;
     $("cloudNote").textContent = card.cloud.note;
+    $("statCloud").classList.toggle("unavailable", !card.wxLive || card.cloud.label === "—");
     $("lookValue").textContent = card.look.short;
     $("lookNote").textContent = card.look.note;
     $("compass").innerHTML = compassSvg(card.look.dir);
@@ -624,6 +652,7 @@
     current = null;
     $("cardSection").hidden = false;
     $("cardPlace").textContent = raw ? "Query · " + raw : "Unknown place";
+    $("cardAsOf").textContent = "Location miss · no invented coordinates";
     $("cardHeadline").textContent = "Couldn’t resolve that location";
     const badge = $("verdictBadge");
     badge.className = "verdict stay";
@@ -631,10 +660,13 @@
     $("verdictSub").textContent = detail || "Paste a 5-digit US ZIP, a seed chip, or lat, lon. No invented coordinates.";
     $("kpValue").textContent = "—";
     $("kpScale").textContent = "—";
+    $("statKp").classList.add("unavailable");
     $("ovationValue").textContent = "—";
     $("ovationNote").textContent = "not fetched";
+    $("statOvation").classList.add("unavailable");
     $("cloudValue").textContent = "—";
     $("cloudNote").textContent = "—";
+    $("statCloud").classList.add("unavailable");
     $("lookValue").textContent = "—";
     $("lookNote").textContent = "—";
     $("compass").innerHTML = compassSvg("N");
@@ -684,12 +716,16 @@
     const cloud = summarizeClouds(weather.hours);
     const hasDark = weather.hours.some((h) => h.night);
     const look = lookHint(place.lat, ovation);
+    const darkKnown = Boolean(wxPack.ok);
+    const cloudsKnown = Boolean(wxPack.ok && cloud.min != null);
     const v = verdict({
       kp: kpNow,
       ovation,
       cloudMin: cloud.min,
       hasDark: hasDark || Boolean(weather.sunset),
       lat: place.lat,
+      darkKnown,
+      cloudsKnown,
     });
 
     const series = (kpPack.forecast || []).filter((row, i, arr) => {
@@ -715,6 +751,16 @@
           : "No 2-hour stretch under 35% cloud. Hour colors: green clear · amber broken · gray socked.")
       : "Sunrise/sunset unavailable — darkness not guessed.";
 
+    const asOfBits = [];
+    asOfBits.push((kpPack.ok ? "Kp live " : "Kp snapshot ") + fmtZulu(now.time_tag));
+    if (ovationTime) {
+      asOfBits.push((ovPack.ok ? "OVATION " : "OVATION snap ") + fmtZulu(ovationTime));
+    } else {
+      asOfBits.push("OVATION unavailable");
+    }
+    asOfBits.push(wxPack.ok ? "clouds live" : "clouds unavailable");
+    const asOfLine = asOfBits.join(" · ");
+
     const card = {
       zip: place.zip,
       city: place.city,
@@ -737,6 +783,7 @@
       sunrise: weather.sunrise,
       darkMeta,
       sourceLine: parts.join(" · "),
+      asOfLine,
       kpLive: kpPack.ok,
       ovLive: ovPack.ok,
       wxLive: wxPack.ok,
@@ -841,10 +888,12 @@
     ctx.fillStyle = "#8b9aab";
     ctx.font = "400 14px IBM Plex Mono, monospace";
     ctx.fillText(card.label + "  ·  " + card.lat.toFixed(2) + "°, " + card.lon.toFixed(2) + "°", 40, 78);
+    ctx.font = "400 12px IBM Plex Mono, monospace";
+    ctx.fillText(String(card.asOfLine || "").slice(0, 92), 40, 98);
 
     ctx.fillStyle = "#e8eef4";
     ctx.font = "700 28px IBM Plex Sans, sans-serif";
-    let y = wrapText(ctx, card.verdict.headline, 40, 118, w - 80, 34);
+    let y = wrapText(ctx, card.verdict.headline, 40, 132, w - 80, 34);
 
     y += 10;
     const cells = [

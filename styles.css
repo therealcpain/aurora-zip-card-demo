@@ -276,6 +276,15 @@ input:focus, button:focus-visible {
   font-family: var(--mono);
 }
 
+.as-of {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: #a8b7c8;
+  line-height: 1.35;
+  max-width: 36rem;
+}
+
 .card-head h3 {
   margin: 0.25rem 0 0;
   font-size: 1.28rem;
@@ -547,3 +556,14 @@ footer ul {
 }
 
 footer li { margin-bottom: 0.25rem; }
+
+
+.stat.unavailable {
+  border-style: dashed;
+  opacity: 0.9;
+}
+
+.stat.unavailable .v {
+  color: var(--muted);
+  font-size: 1.35rem;
+}
